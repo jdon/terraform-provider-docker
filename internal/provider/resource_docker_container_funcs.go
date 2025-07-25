@@ -379,12 +379,23 @@ func resourceDockerContainerCreate(ctx context.Context, d *schema.ResourceData, 
 	}
 	if v, ok := d.GetOk("gpus"); ok {
 		if client.ClientVersion() >= "1.40" {
-			var gpu opts.GpuOpts
-			err := gpu.Set(v.(string))
-			if err != nil {
-				return diag.Errorf("Error setting gpus: %s", err)
+			gpuValue := v.(string)
+			if gpuValue == "nvidia.com/gpu=all" {
+				hostConfig.DeviceRequests = []container.DeviceRequest{
+					{
+						Driver:       "nvidia.com/gpu",
+						Count:        -1,
+						Capabilities: [][]string{{"gpu"}},
+					},
+				}
+			} else {
+				var gpu opts.GpuOpts
+				err := gpu.Set(gpuValue)
+				if err != nil {
+					return diag.Errorf("Error setting gpus: %s", err)
+				}
+				hostConfig.DeviceRequests = gpu.Value()
 			}
-			hostConfig.DeviceRequests = gpu.Value()
 		} else {
 			log.Printf("[WARN] GPU support requires docker version 1.40 or higher")
 		}
